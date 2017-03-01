@@ -53,7 +53,7 @@ Please note that some distributions might use a different directory for system d
 
 ### Enabling your Bluetooth adapter
 
-1. `sudo hciconfig hci0 up` Enables your built-in Bluetooth adapter or external Bluetooth USB dongle
+1. `echo "power on" | sudo bluetoothctl` Enables your built-in Bluetooth adapter or external Bluetooth USB dongle
 
 ### Using BlueZ commandline tools
 BlueZ also provides an interactive commandline tool to interact with Bluetooth devices. You know that your BlueZ installation is working fine if it discovers any Bluetooth devices nearby.
