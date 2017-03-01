@@ -1,5 +1,13 @@
-import dbus
-import dbus.mainloop.glib
+try:
+    import dbus
+    import dbus.mainloop.glib
+except ImportError:
+    import sys
+    print("Module 'dbus' not found")
+    print("Please run: sudo apt-get install python3-dbus")
+    print("See also: https://github.com/getsenic/gatt-python#installing-gatt-sdk-for-python")
+    sys.exit(1)
+
 import re
 
 from gi.repository import GObject
