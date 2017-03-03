@@ -112,7 +112,7 @@ class DeviceManager:
             self.adapter.StartDiscovery()
         except dbus.exceptions.DBusException as e:
             if e.get_dbus_name() == 'org.bluez.Error.NotReady':
-                raise errors.NotReady("Bluetooth adapter not ready. Run 'hciconfig %s up'." % self.adapter_name)
+                raise errors.NotReady("Bluetooth adapter not ready. Run 'echo \"power on\" | sudo bluetoothctl'." % self.adapter_name)
             else:
                 raise _error_from_dbus_error(e)
 
