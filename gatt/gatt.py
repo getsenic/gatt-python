@@ -1,20 +1,12 @@
+import os
 import platform
 
-if platform.system() == 'Linux':
-    from . import gatt_linux
+if platform.system() == 'Darwin':
+    import pdb; pdb.set_trace()
+    if os.environ.get('LINUX_WITHOUT_DBUS', '0') == '0':
+        from .gatt_linux import *
+    else:
+        from .gatt_stubs import *
 else:
     # TODO: Add support for more platforms
-    class DeviceManager:
-        pass
-
-
-    class Device:
-        pass
-
-
-    class Service:
-        pass
-
-
-    class Characteristic:
-        pass
+    from .gatt_stubs import *
