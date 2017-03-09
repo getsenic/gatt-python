@@ -123,7 +123,10 @@ class DeviceManager:
         """
         Stops the discovery started with `start_discovery`
         """
-        pass
+        try:
+            self.adapter.StopDiscovery()
+        except dbus.exceptions.DBusException as e:
+            raise _error_from_dbus_error(e)
 
     def _interfaces_added(self, path, interfaces):
         self._device_discovered(path, interfaces)
