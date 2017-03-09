@@ -113,6 +113,9 @@ class DeviceManager:
         except dbus.exceptions.DBusException as e:
             if e.get_dbus_name() == 'org.bluez.Error.NotReady':
                 raise errors.NotReady("Bluetooth adapter not ready. Run 'echo \"power on\" | sudo bluetoothctl'.")
+            if e.get_dbus_name() == 'org.bluez.Error.InProgress':
+                # Discovery was already started - ignore exception
+                pass
             else:
                 raise _error_from_dbus_error(e)
 
