@@ -126,7 +126,10 @@ class DeviceManager:
         try:
             self.adapter.StopDiscovery()
         except dbus.exceptions.DBusException as e:
-            raise _error_from_dbus_error(e)
+            if (e.get_dbus_name() == 'org.bluez.Error.Failed') and (e.get_dbus_message() == 'No discovery started'):
+                pass
+            else:
+                raise _error_from_dbus_error(e)
 
     def _interfaces_added(self, path, interfaces):
         self._device_discovered(path, interfaces)
