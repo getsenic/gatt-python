@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name='gatt',
     packages=['gatt'],
-    version='0.1.5',
+    version='0.1.6',
     description='Bluetooth GATT SDK for Python',
     keywords='gatt',
     url='https://github.com/getsenic/gatt-python',
