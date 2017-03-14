@@ -74,14 +74,13 @@ class DeviceManager:
 
         _MAIN_LOOP.run()
 
+        self._properties_changed_signal.remove()
+        self._interface_added_signal.remove()
+
     def stop(self):
         """
         Stops the main loop started with `start()`
         """
-        if self._interface_added_signal is not None:
-            self._interface_added_signal.remove()
-        if self._properties_changed_signal is not None:
-            self._properties_changed_signal.remove()
 
         _MAIN_LOOP.quit()
 
@@ -222,6 +221,7 @@ class Device:
         """
         Called when an advertisement package has been received from the device. Requires device discovery to run.
         """
+        pass
 
     def invalidate(self):
         """
