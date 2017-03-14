@@ -40,12 +40,16 @@ class DeviceManager:
             raise _error_from_dbus_error(e)
 
         self.adapter = dbus.Interface(adapter_object, 'org.bluez.Adapter1')
-        self.device_path_regex = re.compile('^/org/bluez/' + adapter_name + '/dev((_[A-Z0-9]{2}){6})$')
+
+        self._object_manager = dbus.Interface(self.bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
+        self._device_path_regex = re.compile('^/org/bluez/' + adapter_name + '/dev((_[A-Z0-9]{2}){6})$')
 
         self._devices = {}
         self._discovered_devices = {}
         self._interface_added_signal = None
         self._properties_changed_signal = None
+
+        self.update_devices()
 
     def run(self):
         """
@@ -53,16 +57,6 @@ class DeviceManager:
 
         This call blocks until you call `stop()` to stop the main loop.
         """
-
-        object_manager = dbus.Interface(self.bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
-        possible_mac_addresses = [self._mac_address(path) for path, _ in object_manager.GetManagedObjects().items()]
-        mac_addresses = [mac_address for mac_address in possible_mac_addresses if mac_address is not None]
-        for mac_address in mac_addresses:
-            if self._devices.get(mac_address, None) is not None:
-                continue
-            device = self.make_device(mac_address)
-            if device is not None:
-                self._devices[mac_address] = device
 
         self._interface_added_signal = self.bus.add_signal_receiver(
             self._interfaces_added,
@@ -91,11 +85,23 @@ class DeviceManager:
 
         _MAIN_LOOP.quit()
 
+    def update_devices(self):
+        managed_objects = self._object_manager.GetManagedObjects().items()
+        possible_mac_addresses = [self._mac_address(path) for path, _ in managed_objects]
+        mac_addresses = [mac_address for mac_address in possible_mac_addresses if mac_address is not None]
+        for mac_address in mac_addresses:
+            if self._devices.get(mac_address) is not None:
+                continue
+            device = self.make_device(mac_address)
+            if device is not None:
+                self._devices[mac_address] = device
+        # TODO: Remove devices from `_devices` that are no longer managed, i.e. deleted
+
     def devices(self):
         """
         Returns all known Bluetooth devices.
         """
-        return self._devices()[:]
+        return self._devices.values()
 
     def start_discovery(self, service_uuids=[]):
         """Starts a discovery for BLE devices with given service UUIDs.
@@ -156,7 +162,7 @@ class DeviceManager:
         device.advertised()
 
     def _mac_address(self, device_path):
-        match = self.device_path_regex.match(device_path)
+        match = self._device_path_regex.match(device_path)
         if not match:
             return None
         return match.group(1)[1:].replace('_', ':').lower()
