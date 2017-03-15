@@ -17,7 +17,7 @@ class AnyDeviceManager(gatt.DeviceManager):
         print("[%s] Discovered, alias = %s" % (device.mac_address, device.alias()))
 
     def make_device(self, mac_address):
-        return AnyDevice(adapter_name=self.adapter_name, mac_address=mac_address)
+        return AnyDevice(mac_address=mac_address, device_manager=self)
 
 
 class AnyDevice(gatt.Device):
@@ -26,8 +26,8 @@ class AnyDevice(gatt.Device):
     and prints all services and characteristics.
     """
 
-    def __init__(self, adapter_name, mac_address, auto_reconnect=False):
-        super().__init__(adapter_name=adapter_name, mac_address=mac_address)
+    def __init__(self, mac_address, device_manager, auto_reconnect=False):
+        super().__init__(mac_address=mac_address, device_manager=device_manager)
         self.auto_reconnect = auto_reconnect
 
     def connect(self):
@@ -93,13 +93,13 @@ def main():
     if args.discover:
         device_manager.start_discovery()
     elif args.connect:
-        device = AnyDevice(adapter_name=args.adapter, mac_address=args.connect)
+        device = AnyDevice(mac_address=args.connect, device_manager=device_manager)
         device.connect()
     elif args.auto:
-        device = AnyDevice(adapter_name=args.adapter, mac_address=args.auto, auto_reconnect=True)
+        device = AnyDevice(mac_address=args.auto, device_manager=device_manager, auto_reconnect=True)
         device.connect()
     elif args.disconnect:
-        device = AnyDevice(adapter_name=args.adapter, mac_address=args.disconnect)
+        device = AnyDevice(mac_address=args.disconnect, device_manager=device_manager)
         if not device.is_connected():
             print("Already disconnected")
             return

@@ -173,7 +173,7 @@ class DeviceManager:
         Override this method to return a specific subclass instance of `Device`.
         Return `None` if the specified device shall not be supported by this class.
         """
-        return Device(adapter_name=self.adapter_name, mac_address=mac_address)
+        return Device(mac_address=mac_address, device_manager=self)
 
     def add_device(self, mac_address):
         """
@@ -191,25 +191,26 @@ class DeviceManager:
 
 
 class Device:
-    def __init__(self, adapter_name, mac_address):
+    def __init__(self, mac_address, device_manager):
         """
         Represents a BLE GATT device.
 
         This class is intended to be sublcassed with a device-specific implementations
         that reflect the device's GATT profile.
+
+        :param mac_address: MAC address of this device
+        :device_manager: Device manager that shall manage this device
         """
+
         self.mac_address = mac_address
-        self.bus = dbus.SystemBus()
+        self.device_manager = device_manager
+        self.bus = device_manager.bus
         self.object_manager = dbus.Interface(
             self.bus.get_object('org.bluez', '/'),
             'org.freedesktop.DBus.ObjectManager')
 
-        # TODO: Get adapter from managed objects? See bluezutils.py
-        adapter_object = self.bus.get_object('org.bluez', '/org/bluez/' + adapter_name)
-        self.adapter = dbus.Interface(adapter_object, 'org.bluez.Adapter1')
-
         # TODO: Device needs to be created if it's not yet known to bluetoothd, see "test-device" in bluez-5.43/test/
-        self.device_path = '/org/bluez/' + adapter_name + '/dev_' + mac_address.replace(':', '_').upper()
+        self.device_path = '/org/bluez/%s/dev_%s' % (device_manager.adapter_name, mac_address.replace(':', '_').upper())
         device_object = self.bus.get_object('org.bluez', self.device_path)
         self.object = dbus.Interface(device_object, 'org.bluez.Device1')
         self.services = []
