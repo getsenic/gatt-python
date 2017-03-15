@@ -93,13 +93,13 @@ def main():
     if args.discover:
         device_manager.start_discovery()
     elif args.connect:
-        device = AnyDevice(mac_address=args.connect, device_manager=device_manager)
+        device = AnyDevice(mac_address=args.connect, manager=device_manager)
         device.connect()
     elif args.auto:
-        device = AnyDevice(mac_address=args.auto, device_manager=device_manager, auto_reconnect=True)
+        device = AnyDevice(mac_address=args.auto, manager=device_manager, auto_reconnect=True)
         device.connect()
     elif args.disconnect:
-        device = AnyDevice(mac_address=args.disconnect, device_manager=device_manager)
+        device = AnyDevice(mac_address=args.disconnect, manager=device_manager)
         if not device.is_connected():
             print("Already disconnected")
             return

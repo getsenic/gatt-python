@@ -32,18 +32,17 @@ class DeviceManager:
         self.listener = None
         self.adapter_name = adapter_name
 
-        self.bus = dbus.SystemBus()
+        self._bus = dbus.SystemBus()
 
         try:
-            adapter_object = self.bus.get_object('org.bluez', '/org/bluez/' + adapter_name)
+            adapter_object = self._bus.get_object('org.bluez', '/org/bluez/' + adapter_name)
         except dbus.exceptions.DBusException as e:
             raise _error_from_dbus_error(e)
+        object_manager_object = self._bus.get_object("org.bluez", "/")
 
-        self.adapter = dbus.Interface(adapter_object, 'org.bluez.Adapter1')
-
-        self._object_manager = dbus.Interface(self.bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
+        self._adapter = dbus.Interface(adapter_object, 'org.bluez.Adapter1')
+        self._object_manager = dbus.Interface(object_manager_object, "org.freedesktop.DBus.ObjectManager")
         self._device_path_regex = re.compile('^/org/bluez/' + adapter_name + '/dev((_[A-Z0-9]{2}){6})$')
-
         self._devices = {}
         self._discovered_devices = {}
         self._interface_added_signal = None
@@ -58,14 +57,14 @@ class DeviceManager:
         This call blocks until you call `stop()` to stop the main loop.
         """
 
-        self._interface_added_signal = self.bus.add_signal_receiver(
+        self._interface_added_signal = self._bus.add_signal_receiver(
             self._interfaces_added,
             dbus_interface='org.freedesktop.DBus.ObjectManager',
             signal_name='InterfacesAdded')
 
         # TODO: Also listen to 'interfaces removed' events?
 
-        self._properties_changed_signal = self.bus.add_signal_receiver(
+        self._properties_changed_signal = self._bus.add_signal_receiver(
             self._properties_changed,
             dbus_interface=dbus.PROPERTIES_IFACE,
             signal_name='PropertiesChanged',
@@ -113,8 +112,8 @@ class DeviceManager:
             discovery_filter['UUIDs'] = service_uuids
 
         try:
-            self.adapter.SetDiscoveryFilter(discovery_filter)
-            self.adapter.StartDiscovery()
+            self._adapter.SetDiscoveryFilter(discovery_filter)
+            self._adapter.StartDiscovery()
         except dbus.exceptions.DBusException as e:
             if e.get_dbus_name() == 'org.bluez.Error.NotReady':
                 raise errors.NotReady("Bluetooth adapter not ready. Run 'echo \"power on\" | sudo bluetoothctl'.")
@@ -129,7 +128,7 @@ class DeviceManager:
         Stops the discovery started with `start_discovery`
         """
         try:
-            self.adapter.StopDiscovery()
+            self._adapter.StopDiscovery()
         except dbus.exceptions.DBusException as e:
             if (e.get_dbus_name() == 'org.bluez.Error.Failed') and (e.get_dbus_message() == 'No discovery started'):
                 pass
@@ -173,7 +172,7 @@ class DeviceManager:
         Override this method to return a specific subclass instance of `Device`.
         Return `None` if the specified device shall not be supported by this class.
         """
-        return Device(mac_address=mac_address, device_manager=self)
+        return Device(mac_address=mac_address, manager=self)
 
     def add_device(self, mac_address):
         """
@@ -191,7 +190,7 @@ class DeviceManager:
 
 
 class Device:
-    def __init__(self, mac_address, device_manager):
+    def __init__(self, mac_address, manager):
         """
         Represents a BLE GATT device.
 
@@ -199,24 +198,23 @@ class Device:
         that reflect the device's GATT profile.
 
         :param mac_address: MAC address of this device
-        :device_manager: Device manager that shall manage this device
+        :manager: `DeviceManager` that shall manage this device
         """
 
         self.mac_address = mac_address
-        self.device_manager = device_manager
-        self.bus = device_manager.bus
-        self.object_manager = dbus.Interface(
-            self.bus.get_object('org.bluez', '/'),
-            'org.freedesktop.DBus.ObjectManager')
-
-        # TODO: Device needs to be created if it's not yet known to bluetoothd, see "test-device" in bluez-5.43/test/
-        self.device_path = '/org/bluez/%s/dev_%s' % (device_manager.adapter_name, mac_address.replace(':', '_').upper())
-        device_object = self.bus.get_object('org.bluez', self.device_path)
-        self.object = dbus.Interface(device_object, 'org.bluez.Device1')
+        self.manager = manager
         self.services = []
 
-        self.properties = dbus.Interface(self.object, 'org.freedesktop.DBus.Properties')
-        self.properties_signal_match = self.properties.connect_to_signal('PropertiesChanged', self.properties_changed)
+        self._bus = manager._bus
+        self._object_manager = manager._object_manager
+
+        # TODO: Device needs to be created if it's not yet known to bluetoothd, see "test-device" in bluez-5.43/test/
+        self._device_path = '/org/bluez/%s/dev_%s' % (manager.adapter_name, mac_address.replace(':', '_').upper())
+        device_object = self._bus.get_object('org.bluez', self._device_path)
+        self._object = dbus.Interface(device_object, 'org.bluez.Device1')
+        self._properties = dbus.Interface(self._object, 'org.freedesktop.DBus.Properties')
+        self._properties_signal_match = self._properties.connect_to_signal('PropertiesChanged', self.properties_changed)
+        self._connect_retry_attempt = None
 
     def advertised(self):
         """
@@ -228,7 +226,7 @@ class Device:
         """
         Invalidates all properties and services.
         """
-        self.properties_signal_match.remove()
+        self._properties_signal_match.remove()
         self.invalidate_services()
 
     def invalidate_services(self):
@@ -256,7 +254,7 @@ class Device:
     def _connect(self):
         self._connect_retry_attempt += 1
         try:
-            self.object.Connect()
+            self._object.Connect()
             if self.is_services_resolved():
                 self.services_resolved()
         except dbus.exceptions.DBusException as e:
@@ -293,7 +291,7 @@ class Device:
         """
         Disconnects from the device, if connected.
         """
-        self.object.Disconnect()
+        self._object.Disconnect()
 
 
     def disconnect_succeeded(self):
@@ -306,19 +304,19 @@ class Device:
         """
         Returns `True` if the device is connected, otherwise `False`.
         """
-        return self.properties.Get('org.bluez.Device1', 'Connected') == 1
+        return self._properties.Get('org.bluez.Device1', 'Connected') == 1
 
     def is_services_resolved(self):
         """
         Returns `True` is services are discovered, otherwise `False`.
         """
-        return self.properties.Get('org.bluez.Device1', 'ServicesResolved') == 1
+        return self._properties.Get('org.bluez.Device1', 'ServicesResolved') == 1
 
     def alias(self):
         """
         Returns the device's alias (name).
         """
-        return self.properties.Get('org.bluez.Device1', 'Alias')
+        return self._properties.Get('org.bluez.Device1', 'Alias')
 
     def properties_changed(self, sender, changed_properties, invalidated_properties):
         """
@@ -339,9 +337,9 @@ class Device:
         """
         self.invalidate_services()
 
-        services_regex = re.compile(self.device_path + '/service[0-9abcdef]{4}$')
+        services_regex = re.compile(self._device_path + '/service[0-9abcdef]{4}$')
         managed_services = [
-            service for service in self.object_manager.GetManagedObjects().items()
+            service for service in self._object_manager.GetManagedObjects().items()
             if services_regex.match(service[0])]
         self.services = [Service(
             device=self,
@@ -396,12 +394,13 @@ class Service:
     Represents a GATT service.
     """
     def __init__(self, device, path, uuid):
+        # TODO: Don'T requore `path` argument, it can be calculated from device's path and uuid
         self.device = device
-        self.path = path
         self.uuid = uuid
-        self.bus = device.bus
-        self.object_manager = device.object_manager
-        self.object = self.bus.get_object('org.bluez', path)
+        self._path = path
+        self._bus = device._bus
+        self._object_manager = device._object_manager
+        self._object = self._bus.get_object('org.bluez', self._path)
         self.characteristics = []
         self.characteristics_resolved()
 
@@ -424,9 +423,9 @@ class Service:
         """
         self.invalidate_characteristics()
 
-        characteristics_regex = re.compile(self.path + '/char[0-9abcdef]{4}$')
+        characteristics_regex = re.compile(self._path + '/char[0-9abcdef]{4}$')
         managed_characteristics = [
-            char for char in self.object_manager.GetManagedObjects().items()
+            char for char in self._object_manager.GetManagedObjects().items()
             if characteristics_regex.match(char[0])]
         self.characteristics = [Characteristic(
             service=self,
@@ -439,20 +438,21 @@ class Characteristic:
     Represents a GATT characteristic.
     """
     def __init__(self, service, path, uuid):
+        # TODO: Don't require `path` parameter, it can be calculated from service's path and uuid
         self.service = service
-        self.path = path
         self.uuid = uuid
-        self.bus = service.bus
-        self.object_manager = service.object_manager
-        self.object = self.bus.get_object('org.bluez', path)
-        self.properties = dbus.Interface(self.object, "org.freedesktop.DBus.Properties")
-        self.properties_signal = self.properties.connect_to_signal('PropertiesChanged', self.properties_changed)
+        self._path = path
+        self._bus = service._bus
+        self._object_manager = service._object_manager
+        self._object = self._bus.get_object('org.bluez', self._path)
+        self._properties = dbus.Interface(self._object, "org.freedesktop.DBus.Properties")
+        self._properties_signal = self._properties.connect_to_signal('PropertiesChanged', self.properties_changed)
 
     def invalidate(self):
         """
         Invalidates the characteristic.
         """
-        self.properties_signal.remove()
+        self._properties_signal.remove()
 
     def properties_changed(self, properties, changed_properties, invalidated_properties):
         value = changed_properties.get('Value')
@@ -470,7 +470,7 @@ class Characteristic:
         otherwise `characteristic_read_value_failed()` is invoked.
         """
         try:
-            return self.object.ReadValue(
+            return self._object.ReadValue(
                 {'offset': dbus.UInt16(offset, variant_level=1)},
                 dbus_interface='org.bluez.GattCharacteristic1')
         except dbus.exceptions.DBusException as e:
@@ -490,22 +490,22 @@ class Characteristic:
         bytes = [dbus.Byte(b) for b in value]
 
         try:
-            self.object.WriteValue(
+            self._object.WriteValue(
                 bytes,
                 {'offset': dbus.UInt16(offset, variant_level=1)},
-                reply_handler=self.write_value_succeeded,
-                error_handler=self.write_value_failed,
+                reply_handler=self._write_value_succeeded,
+                error_handler=self._write_value_failed,
                 dbus_interface='org.bluez.GattCharacteristic1')
         except dbus.exceptions.DBusException as e:
-            self.write_value_failed(self, error=e)
+            self._write_value_failed(self, error=e)
 
-    def write_value_succeeded(self):
+    def _write_value_succeeded(self):
         """
         Called when the write request has succeeded.
         """
         self.service.device.characteristic_write_value_succeeded(characteristic=self)
 
-    def write_value_failed(self, dbus_error):
+    def _write_value_failed(self, dbus_error):
         """
         Called when the write request has failed.
         """
@@ -524,25 +524,25 @@ class Characteristic:
         """
         try:
             if enabled:
-                self.object.StartNotify(
-                    reply_handler=self.enable_notifications_succeeded,
-                    error_handler=self.enable_notifications_failed,
+                self._object.StartNotify(
+                    reply_handler=self._enable_notifications_succeeded,
+                    error_handler=self._enable_notifications_failed,
                     dbus_interface='org.bluez.GattCharacteristic1')
             else:
-                self.object.StopNotify(
-                    reply_handler=self.enable_notifications_succeeded,
-                    error_handler=self.enable_notifications_failed,
+                self._object.StopNotify(
+                    reply_handler=self._enable_notifications_succeeded,
+                    error_handler=self._enable_notifications_failed,
                     dbus_interface='org.bluez.GattCharacteristic1')
         except dbus.exceptions.DBusException as e:
-            self.enable_notifications_failed(error=e)
+            self._enable_notifications_failed(error=e)
 
-    def enable_notifications_succeeded(self):
+    def _enable_notifications_succeeded(self):
         """
         Called when notification enabling has succeeded.
         """
         self.service.device.characteristic_enable_notifications_succeeded(characteristic=self)
 
-    def enable_notifications_failed(self, dbus_error):
+    def _enable_notifications_failed(self, dbus_error):
         """
         Called when notification enabling has failed.
         """
