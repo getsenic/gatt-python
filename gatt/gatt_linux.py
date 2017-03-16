@@ -18,8 +18,6 @@ from . import errors
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 dbus.mainloop.glib.threads_init()
 
-_MAIN_LOOP = GObject.MainLoop()
-
 
 class DeviceManager:
     """
@@ -33,13 +31,11 @@ class DeviceManager:
         self.adapter_name = adapter_name
 
         self._bus = dbus.SystemBus()
-
         try:
             adapter_object = self._bus.get_object('org.bluez', '/org/bluez/' + adapter_name)
         except dbus.exceptions.DBusException as e:
             raise _error_from_dbus_error(e)
         object_manager_object = self._bus.get_object("org.bluez", "/")
-
         self._adapter = dbus.Interface(adapter_object, 'org.bluez.Adapter1')
         self._object_manager = dbus.Interface(object_manager_object, "org.freedesktop.DBus.ObjectManager")
         self._device_path_regex = re.compile('^/org/bluez/' + adapter_name + '/dev((_[A-Z0-9]{2}){6})$')
@@ -47,6 +43,7 @@ class DeviceManager:
         self._discovered_devices = {}
         self._interface_added_signal = None
         self._properties_changed_signal = None
+        self._main_loop = None
 
         self.update_devices()
 
@@ -56,6 +53,9 @@ class DeviceManager:
 
         This call blocks until you call `stop()` to stop the main loop.
         """
+
+        if self._main_loop:
+            return
 
         self._interface_added_signal = self._bus.add_signal_receiver(
             self._interfaces_added,
@@ -71,28 +71,41 @@ class DeviceManager:
             arg0='org.bluez.Device1',
             path_keyword='path')
 
-        _MAIN_LOOP.run()
+        def disconnect_signals():
+            for device in self._devices.values():
+                device.invalidate()
+            self._properties_changed_signal.remove()
+            self._interface_added_signal.remove()
 
-        self._properties_changed_signal.remove()
-        self._interface_added_signal.remove()
+        self._main_loop = GObject.MainLoop()
+        try:
+            self._main_loop.run()
+            disconnect_signals()
+        except:
+            disconnect_signals()
+            raise
 
     def stop(self):
         """
         Stops the main loop started with `start()`
         """
+        if self._main_loop:
+            self._main_loop.quit()
+            self._main_loop = None
 
-        _MAIN_LOOP.quit()
+    def _manage_device(self, device):
+        existing_device = self._devices.get(device.mac_address)
+        if existing_device is not None:
+            existing_device.invalidate()
+        self._devices[device.mac_address] = device
 
     def update_devices(self):
         managed_objects = self._object_manager.GetManagedObjects().items()
         possible_mac_addresses = [self._mac_address(path) for path, _ in managed_objects]
-        mac_addresses = [mac_address for mac_address in possible_mac_addresses if mac_address is not None]
-        for mac_address in mac_addresses:
-            if self._devices.get(mac_address) is not None:
-                continue
-            device = self.make_device(mac_address)
-            if device is not None:
-                self._devices[mac_address] = device
+        mac_addresses = [m for m in possible_mac_addresses if m is not None]
+        new_mac_addresses = [m for m in mac_addresses if not m in self._devices]
+        for mac_address in new_mac_addresses:
+            self.make_device(mac_address)
         # TODO: Remove devices from `_devices` that are no longer managed, i.e. deleted
 
     def devices(self):
@@ -148,13 +161,9 @@ class DeviceManager:
         mac_address = self._mac_address(path)
         if not mac_address:
             return
-        device = self._devices.get(mac_address, None)
-        if device is None:
-            device = self.make_device(mac_address)
-        if device is None:
-            return
-        self._devices[mac_address] = device
-        self.device_discovered(device)
+        device = self._devices.get(mac_address) or self.make_device(mac_address)
+        if device is not None:
+            self.device_discovered(device)
 
     def device_discovered(self, device):
         device.advertised()
@@ -213,28 +222,16 @@ class Device:
         device_object = self._bus.get_object('org.bluez', self._device_path)
         self._object = dbus.Interface(device_object, 'org.bluez.Device1')
         self._properties = dbus.Interface(self._object, 'org.freedesktop.DBus.Properties')
-        self._properties_signal_match = self._properties.connect_to_signal('PropertiesChanged', self.properties_changed)
+        self._properties_signal = None
         self._connect_retry_attempt = None
+
+        manager._manage_device(self)
 
     def advertised(self):
         """
         Called when an advertisement package has been received from the device. Requires device discovery to run.
         """
         pass
-
-    def invalidate(self):
-        """
-        Invalidates all properties and services.
-        """
-        self._properties_signal_match.remove()
-        self.invalidate_services()
-
-    def invalidate_services(self):
-        """
-        Invalidates all services
-        """
-        for service in self.services:
-            service.invalidate()
 
     def is_registered(self):
         # TODO: Implement, see __init__
@@ -244,11 +241,15 @@ class Device:
         # TODO: Implement, see __init__
         return
 
+    def invalidate(self):
+        self._disconnect_signals()
+
     def connect(self):
         """
         Connects to the device. Blocks until the connection was successful.
         """
         self._connect_retry_attempt = 0
+        self._connect_signals()
         self._connect()
 
     def _connect(self):
@@ -274,6 +275,15 @@ class Device:
             else:
                 self.connect_failed(_error_from_dbus_error(e))
 
+    def _connect_signals(self):
+        if self._properties_signal is None:
+            self._properties_signal = self._properties.connect_to_signal('PropertiesChanged', self.properties_changed)
+        self._connect_service_signals()
+
+    def _connect_service_signals(self):
+        for service in self.services:
+            service._connect_signals()
+
     def connect_succeeded(self):
         """
         Will be called when `connect()` has finished connecting to the device.
@@ -285,7 +295,7 @@ class Device:
         """
         Called when the connection could not be established.
         """
-        pass
+        self._disconnect_signals()
 
     def disconnect(self):
         """
@@ -293,18 +303,27 @@ class Device:
         """
         self._object.Disconnect()
 
-
     def disconnect_succeeded(self):
         """
         Will be called when the device has disconnected.
         """
-        pass
+        self._disconnect_signals()
+
+    def _disconnect_signals(self):
+        if self._properties_signal is not None:
+            self._properties_signal.remove()
+            self._properties_signal = None
+        self._disconnect_service_signals()
+
+    def _disconnect_service_signals(self):
+        for service in self.services:
+            service._disconnect_signals()
 
     def is_connected(self):
         """
         Returns `True` if the device is connected, otherwise `False`.
         """
-        return self._properties.Get('org.bluez.Device1', 'Connected') == 1
+        return self._properties_signal and self._properties.Get('org.bluez.Device1', 'Connected') == 1
 
     def is_services_resolved(self):
         """
@@ -335,7 +354,7 @@ class Device:
         """
         Called when all device's services and characteristics got resolved.
         """
-        self.invalidate_services()
+        self._disconnect_service_signals()
 
         services_regex = re.compile(self._device_path + '/service[0-9abcdef]{4}$')
         managed_services = [
@@ -345,6 +364,8 @@ class Device:
             device=self,
             path=service[0],
             uuid=service[1]['org.bluez.GattService1']['UUID']) for service in managed_services]
+
+        self._connect_service_signals()
 
     def characteristic_value_updated(self, characteristic, value):
         """
@@ -404,24 +425,25 @@ class Service:
         self.characteristics = []
         self.characteristics_resolved()
 
-    def invalidate(self):
-        """
-        Invalidates all found characteristics.
-        """
-        self.invalidate_characteristics()
+    def _connect_signals(self):
+        self._connect_characteristic_signals()
 
-    def invalidate_characteristics(self):
-        """
-        Invalidates all found characteristics.
-        """
+    def _connect_characteristic_signals(self):
         for characteristic in self.characteristics:
-            characteristic.invalidate()
+            characteristic._connect_signals()
+
+    def _disconnect_signals(self):
+        self._disconnect_characteristic_signals()
+
+    def _disconnect_characteristic_signals(self):
+        for characteristic in self.characteristics:
+            characteristic._disconnect_signals()
 
     def characteristics_resolved(self):
         """
         Called when all service's characteristics got resolved.
         """
-        self.invalidate_characteristics()
+        self._disconnect_characteristic_signals()
 
         characteristics_regex = re.compile(self._path + '/char[0-9abcdef]{4}$')
         managed_characteristics = [
@@ -431,6 +453,8 @@ class Service:
             service=self,
             path=c[0],
             uuid=c[1]['org.bluez.GattCharacteristic1']['UUID']) for c in managed_characteristics]
+
+        self._connect_characteristic_signals()
 
 
 class Characteristic:
@@ -446,13 +470,16 @@ class Characteristic:
         self._object_manager = service._object_manager
         self._object = self._bus.get_object('org.bluez', self._path)
         self._properties = dbus.Interface(self._object, "org.freedesktop.DBus.Properties")
-        self._properties_signal = self._properties.connect_to_signal('PropertiesChanged', self.properties_changed)
+        self._properties_signal = None
 
-    def invalidate(self):
-        """
-        Invalidates the characteristic.
-        """
-        self._properties_signal.remove()
+    def _connect_signals(self):
+        if self._properties_signal is None:
+            self._properties_signal = self._properties.connect_to_signal('PropertiesChanged', self.properties_changed)
+
+    def _disconnect_signals(self):
+        if self._properties_signal is not None:
+            self._properties_signal.remove()
+            self._properties_signal = None
 
     def properties_changed(self, properties, changed_properties, invalidated_properties):
         value = changed_properties.get('Value')

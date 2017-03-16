@@ -17,7 +17,7 @@ class AnyDeviceManager(gatt.DeviceManager):
         print("[%s] Discovered, alias = %s" % (device.mac_address, device.alias()))
 
     def make_device(self, mac_address):
-        return AnyDevice(mac_address=mac_address, device_manager=self)
+        return AnyDevice(mac_address=mac_address, manager=self)
 
 
 class AnyDevice(gatt.Device):
@@ -26,8 +26,8 @@ class AnyDevice(gatt.Device):
     and prints all services and characteristics.
     """
 
-    def __init__(self, mac_address, device_manager, auto_reconnect=False):
-        super().__init__(mac_address=mac_address, device_manager=device_manager)
+    def __init__(self, mac_address, manager, auto_reconnect=False):
+        super().__init__(mac_address=mac_address, manager=manager)
         self.auto_reconnect = auto_reconnect
 
     def connect(self):
@@ -100,10 +100,8 @@ def main():
         device.connect()
     elif args.disconnect:
         device = AnyDevice(mac_address=args.disconnect, manager=device_manager)
-        if not device.is_connected():
-            print("Already disconnected")
-            return
         device.disconnect()
+        return
 
     print("Terminate with Ctrl+C")
     try:
