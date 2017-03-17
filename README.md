@@ -116,6 +116,10 @@ Once `gatt.DeviceManager` has discovered a Bluetooth device you can use the `gat
 The following implementation of `gatt.Device` connects to any Bluetooth device and prints all relevant events:
 
 ```python
+import gatt
+
+manager = gatt.DeviceManager(adapter_name='hci0')
+
 class AnyDevice(gatt.Device):
     def connect_succeeded(self):
         super().connect_succeeded()
@@ -139,10 +143,9 @@ class AnyDevice(gatt.Device):
                 print("[%s]    Characteristic [%s]" % (self.mac_address, characteristic.uuid))
 
 
-device = AnyDevice(adapter_name='hci0', mac_address='AA:BB:CC:DD:EE:FF')
+device = AnyDevice(mac_address='AA:BB:CC:DD:EE:FF', manager=manager)
 device.connect()
 
-manager = gatt.DeviceManager(adapter_name='hci0')
 manager.run()
 ```
 
@@ -158,6 +161,8 @@ The following example reads the device's firmware version after all services and
 
 ```python
 import gatt
+
+manager = gatt.DeviceManager(adapter_name='hci0')
 
 class AnyDevice(gatt.Device):
     def services_resolved(self):
@@ -177,10 +182,9 @@ class AnyDevice(gatt.Device):
         print("Firmware version:", value.decode("utf-8"))
 
 
-device = AnyDevice(adapter_name='hci0', mac_address='AA:BB:CC:DD:EE:FF')
+device = AnyDevice(mac_address='AA:BB:CC:DD:EE:FF', manager=manager)
 device.connect()
 
-manager = gatt.DeviceManager(adapter_name='hci0')
 manager.run()
 ```
 
