@@ -323,7 +323,7 @@ class Device:
         """
         Returns `True` if the device is connected, otherwise `False`.
         """
-        return self._properties_signal and self._properties.Get('org.bluez.Device1', 'Connected') == 1
+        return self._properties.Get('org.bluez.Device1', 'Connected') == 1
 
     def is_services_resolved(self):
         """
