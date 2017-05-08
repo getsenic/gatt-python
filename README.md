@@ -196,7 +196,7 @@ To subscribe for characteristic value change notifications call `enable_notifica
 
 ## Support
 
-Please open an issue or drop us an email to [developers@senic.com](mailto:developers@senic.com).
+Please [open an issue](https://github.com/getsenic/gatt-python/issues) for this repository.
 
 ## Contributing
 
