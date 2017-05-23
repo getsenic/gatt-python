@@ -66,6 +66,18 @@ def main():
         help="Name of Bluetooth adapter, defaults to 'hci0'")
     arg_commands_group = arg_parser.add_mutually_exclusive_group(required=True)
     arg_commands_group.add_argument(
+        '--power-on',
+        action='store_true',
+        help="Powers the adapter on")
+    arg_commands_group.add_argument(
+        '--power-off',
+        action='store_true',
+        help="Powers the adapter off")
+    arg_commands_group.add_argument(
+        '--powered',
+        action='store_true',
+        help="Print the adapter's power state")
+    arg_commands_group.add_argument(
         '--discover',
         action='store_true',
         help="Lists all nearby GATT devices")
@@ -89,6 +101,17 @@ def main():
     global device_manager
     device_manager = AnyDeviceManager(adapter_name=args.adapter)
 
+    if args.power_on:
+        device_manager.is_adapter_powered = True
+        print("Powered on")
+        return
+    elif args.power_off:
+        device_manager.is_adapter_powered = False
+        print("Powered off")
+        return
+    elif args.powered:
+        print("Powered: ", device_manager.is_adapter_powered)
+        return
     if args.discover:
         device_manager.start_discovery()
     elif args.connect:

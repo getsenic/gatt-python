@@ -37,6 +37,7 @@ class DeviceManager:
             raise _error_from_dbus_error(e)
         object_manager_object = self._bus.get_object("org.bluez", "/")
         self._adapter = dbus.Interface(adapter_object, 'org.bluez.Adapter1')
+        self._adapter_properties = dbus.Interface(self._adapter, 'org.freedesktop.DBus.Properties')
         self._object_manager = dbus.Interface(object_manager_object, "org.freedesktop.DBus.ObjectManager")
         self._device_path_regex = re.compile('^/org/bluez/' + adapter_name + '/dev((_[A-Z0-9]{2}){6})$')
         self._devices = {}
@@ -46,6 +47,14 @@ class DeviceManager:
         self._main_loop = None
 
         self.update_devices()
+
+    @property
+    def is_adapter_powered(self):
+        return self._adapter_properties.Get('org.bluez.Adapter1', 'Powered') == 1
+
+    @is_adapter_powered.setter
+    def is_adapter_powered(self, powered):
+        return self._adapter_properties.Set('org.bluez.Adapter1', 'Powered', dbus.Boolean(powered))
 
     def run(self):
         """
@@ -129,7 +138,9 @@ class DeviceManager:
             self._adapter.StartDiscovery()
         except dbus.exceptions.DBusException as e:
             if e.get_dbus_name() == 'org.bluez.Error.NotReady':
-                raise errors.NotReady("Bluetooth adapter not ready. Run 'echo \"power on\" | sudo bluetoothctl'.")
+                raise errors.NotReady(
+                    "Bluetooth adapter not ready. "
+                    "Set `is_adapter_powered` to `True` or run 'echo \"power on\" | sudo bluetoothctl'.")
             if e.get_dbus_name() == 'org.bluez.Error.InProgress':
                 # Discovery was already started - ignore exception
                 pass
