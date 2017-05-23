@@ -81,7 +81,7 @@ class DeviceManager:
         try:
             self._main_loop.run()
             disconnect_signals()
-        except:
+        except Exception:
             disconnect_signals()
             raise
 
@@ -103,7 +103,7 @@ class DeviceManager:
         managed_objects = self._object_manager.GetManagedObjects().items()
         possible_mac_addresses = [self._mac_address(path) for path, _ in managed_objects]
         mac_addresses = [m for m in possible_mac_addresses if m is not None]
-        new_mac_addresses = [m for m in mac_addresses if not m in self._devices]
+        new_mac_addresses = [m for m in mac_addresses if m not in self._devices]
         for mac_address in new_mac_addresses:
             self.make_device(mac_address)
         # TODO: Remove devices from `_devices` that are no longer managed, i.e. deleted
@@ -414,6 +414,7 @@ class Service:
     """
     Represents a GATT service.
     """
+
     def __init__(self, device, path, uuid):
         # TODO: Don'T requore `path` argument, it can be calculated from device's path and uuid
         self.device = device
@@ -461,6 +462,7 @@ class Characteristic:
     """
     Represents a GATT characteristic.
     """
+
     def __init__(self, service, path, uuid):
         # TODO: Don't require `path` parameter, it can be calculated from service's path and uuid
         self.service = service
@@ -503,7 +505,6 @@ class Characteristic:
         except dbus.exceptions.DBusException as e:
             error = _error_from_dbus_error(e)
             self.service.device.characteristic_read_value_failed(self, error=error)
-
 
     def write_value(self, value, offset=0):
         """
@@ -584,11 +585,11 @@ class Characteristic:
 
 def _error_from_dbus_error(e):
     return {
-        'org.bluez.Error.Failed':                  errors.Failed(e.get_dbus_message()),
-        'org.bluez.Error.InProgress':              errors.InProgress(e.get_dbus_message()),
-        'org.bluez.Error.InvalidValueLength':      errors.InvalidValueLength(e.get_dbus_message()),
-        'org.bluez.Error.NotAuthorized':           errors.NotAuthorized(e.get_dbus_message()),
-        'org.bluez.Error.NotPermitted':            errors.NotPermitted(e.get_dbus_message()),
-        'org.bluez.Error.NotSupported':            errors.NotSupported(e.get_dbus_message()),
+        'org.bluez.Error.Failed': errors.Failed(e.get_dbus_message()),
+        'org.bluez.Error.InProgress': errors.InProgress(e.get_dbus_message()),
+        'org.bluez.Error.InvalidValueLength': errors.InvalidValueLength(e.get_dbus_message()),
+        'org.bluez.Error.NotAuthorized': errors.NotAuthorized(e.get_dbus_message()),
+        'org.bluez.Error.NotPermitted': errors.NotPermitted(e.get_dbus_message()),
+        'org.bluez.Error.NotSupported': errors.NotSupported(e.get_dbus_message()),
         'org.freedesktop.DBus.Error.AccessDenied': errors.AccessDenied("Root permissions required")
     }.get(e.get_dbus_name(), errors.Failed(e.get_dbus_message()))
