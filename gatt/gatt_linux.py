@@ -549,7 +549,7 @@ class Characteristic:
         Called when the write request has failed.
         """
         error = _error_from_dbus_error(dbus_error)
-        self.service.device.characteristic_write_value_failed(self, error=error)
+        self.service.device.characteristic_write_value_failed(characteristic=self, error=error)
 
     def enable_notifications(self, enabled=True):
         """
