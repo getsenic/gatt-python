@@ -210,7 +210,7 @@ class DeviceManager:
 
 
 class Device:
-    def __init__(self, mac_address, manager):
+    def __init__(self, mac_address, manager, managed=True):
         """
         Represents a BLE GATT device.
 
@@ -219,6 +219,10 @@ class Device:
 
         :param mac_address: MAC address of this device
         :manager: `DeviceManager` that shall manage this device
+        :managed: If False, the created device will not be managed by the device manager
+                  Particularly of interest for sub classes of `DeviceManager` who want
+                  to decide on certain device properties if they then create a subclass
+                  instance of that `Device` or not.
         """
 
         self.mac_address = mac_address
@@ -236,7 +240,8 @@ class Device:
         self._properties_signal = None
         self._connect_retry_attempt = None
 
-        manager._manage_device(self)
+        if managed:
+            manager._manage_device(self)
 
     def advertised(self):
         """
