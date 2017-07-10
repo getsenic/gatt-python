@@ -351,7 +351,16 @@ class Device:
         """
         Returns the device's alias (name).
         """
-        return self._properties.Get('org.bluez.Device1', 'Alias')
+        try:
+            return self._properties.Get('org.bluez.Device1', 'Alias')
+        except dbus.exceptions.DBusException as e:
+            if e.get_dbus_name() == 'org.freedesktop.DBus.Error.UnknownObject':
+                # BlueZ sometimes doesn't provide an alias, we then simply return `None`.
+                # Might occur when device was deleted as the following issue points out:
+                # https://github.com/blueman-project/blueman/issues/460
+                return None
+            else:
+                raise _error_from_dbus_error(e)
 
     def properties_changed(self, sender, changed_properties, invalidated_properties):
         """
