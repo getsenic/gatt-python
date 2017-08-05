@@ -272,8 +272,9 @@ class Device:
         self._connect_retry_attempt += 1
         try:
             self._object.Connect()
-            if self.is_services_resolved():
+            if not self.services and self.is_services_resolved():
                 self.services_resolved()
+
         except dbus.exceptions.DBusException as e:
             if (e.get_dbus_name() == 'org.freedesktop.DBus.Error.UnknownObject'):
                 self.connect_failed(errors.Failed("Device does not exist, check adapter name and MAC address."))
@@ -324,6 +325,7 @@ class Device:
         Will be called when the device has disconnected.
         """
         self._disconnect_signals()
+        self.services = []
 
     def _disconnect_signals(self):
         if self._properties_signal is not None:
@@ -372,7 +374,8 @@ class Device:
             else:
                 self.disconnect_succeeded()
 
-        if 'ServicesResolved' in changed_properties and changed_properties['ServicesResolved'] == 1:
+        if ('ServicesResolved' in changed_properties and changed_properties['ServicesResolved'] == 1 and
+                not self.services):
             self.services_resolved()
 
     def services_resolved(self):
