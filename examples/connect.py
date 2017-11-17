@@ -32,8 +32,9 @@ args = arg_parser.parse_args()
 
 print("Connecting...")
 
-device = AnyDevice(adapter_name='hci0', mac_address=args.mac_address)
+manager = gatt.DeviceManager(adapter_name='hci0')
+
+device = AnyDevice(manager=manager, mac_address=args.mac_address)
 device.connect()
 
-manager = gatt.DeviceManager(adapter_name='hci0')
 manager.run()
