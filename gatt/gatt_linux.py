@@ -121,6 +121,7 @@ class DeviceManager:
         """
         Returns all known Bluetooth devices.
         """
+        self.update_devices()
         return self._devices.values()
 
     def start_discovery(self, service_uuids=[]):
