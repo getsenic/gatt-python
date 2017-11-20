@@ -209,6 +209,24 @@ class DeviceManager:
         # TODO: Implement
         pass
 
+    def remove_all_devices(self, skip_alias=None):
+        self.update_devices()
+
+        keys_to_be_deleted = []
+        for key, device in self._devices.items():
+            if skip_alias and device.alias() == skip_alias:
+                continue
+            mac_address = device.mac_address.replace(':', '_').upper()
+            path = '/org/bluez/%s/dev_%s' % (self.adapter_name, mac_address)
+            self._adapter.RemoveDevice(path)
+            keys_to_be_deleted.append(key)
+
+        for key in keys_to_be_deleted:
+            del self._devices[key]
+
+        self.update_devices()
+
+
 
 class Device:
     def __init__(self, mac_address, manager, managed=True):
