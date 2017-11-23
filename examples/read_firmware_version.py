@@ -24,8 +24,9 @@ arg_parser = ArgumentParser(description="GATT Read Firmware Version Demo")
 arg_parser.add_argument('mac_address', help="MAC address of device to connect")
 args = arg_parser.parse_args()
 
-device = AnyDevice(adapter_name='hci0', mac_address=args.mac_address)
+manager = gatt.DeviceManager(adapter_name='hci0')
+
+device = AnyDevice(manager=manager, mac_address=args.mac_address)
 device.connect()
 
-manager = gatt.DeviceManager(adapter_name='hci0')
 manager.run()
