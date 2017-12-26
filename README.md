@@ -15,6 +15,8 @@ Currently Linux is the only platform supported by this library. Unlike other lib
 ## Prerequisites
 The GATT SDK requires [Python 3.4+](https://www.python.org). Currently Linux is the only supported operating system and therefor it needs a recent installation of [BlueZ](http://www.bluez.org/). It is tested to work fine with BlueZ 5.44, slightly older versions should however work, too.
 
+[Issue 12](https://github.com/getsenic/gatt-python/issues/12) confirms that Bluez <=5.23 is not working.
+
 ## Installation
 These instructions assume a Debian-based Linux.
 
