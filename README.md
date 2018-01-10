@@ -13,7 +13,7 @@ The Bluetooth GATT SDK for Python helps you implementing and communicating with 
 Currently Linux is the only platform supported by this library. Unlike other libraries this GATT SDK is based directly on the mature and stable D-Bus API of BlueZ to interact with Bluetooth devices. In the future we would like to make this library platform-independent by integrating with more Bluetooth APIs of other operating systems such as MacOS and Windows.
 
 ## Prerequisites
-The GATT SDK requires [Python 3.4+](https://www.python.org). Currently Linux is the only supported operating system and therefor it needs a recent installation of [BlueZ](http://www.bluez.org/). It is tested to work fine with BlueZ 5.44, slightly older versions should however work, too.
+The GATT SDK requires [Python 3.4+](https://www.python.org). Currently Linux is the only supported operating system and therefor it needs a recent installation of [BlueZ](http://www.bluez.org/). It is tested to work fine with BlueZ 5.44, any release >= 5.38 should however work, too.
 
 ## Installation
 These instructions assume a Debian-based Linux.
