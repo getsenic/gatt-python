@@ -86,7 +86,7 @@ class DeviceManager:
             self._properties_changed_signal.remove()
             self._interface_added_signal.remove()
 
-        self._main_loop = GObject.MainLoop()
+        self._main_loop = GObject.MainLoop.new(None, False)
         try:
             self._main_loop.run()
             disconnect_signals()
