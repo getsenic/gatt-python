@@ -456,6 +456,13 @@ class Device:
         # To be implemented by subclass
         pass
 
+    def descriptor_read_value_failed(self, descriptor, error):
+        """
+        Called when a descriptor read command failed.
+        """
+        # To be implemented by subclass
+        pass
+
 
 class Service:
     """
@@ -505,6 +512,35 @@ class Service:
         self._connect_characteristic_signals()
 
 
+class Descriptor:
+    """
+    Represents a GATT Descriptor which can contain metadata or configuration of its characteristic.
+    """
+
+    def __init__(self, characteristic, path, uuid):
+        self.characteristic = characteristic
+        self.uuid = uuid
+        self._bus = characteristic._bus
+        self._path = path
+        self._object = self._bus.get_object('org.bluez', self._path)
+
+    def read_value(self, offset=0):
+        """
+        Reads the value of this descriptor.
+
+        When successful, the value will be returned, otherwise `descriptor_read_value_failed()` of the related
+        device is invoked.
+        """
+        try:
+            val = self._object.ReadValue(
+                {'offset': dbus.UInt16(offset, variant_level=1)},
+                dbus_interface='org.bluez.GattDescriptor1')
+            return val
+        except dbus.exceptions.DBusException as e:
+            error = _error_from_dbus_error(e)
+            self.service.device.descriptor_read_value_failed(self, error=error)
+
+
 class Characteristic:
     """
     Represents a GATT characteristic.
@@ -520,6 +556,15 @@ class Characteristic:
         self._object = self._bus.get_object('org.bluez', self._path)
         self._properties = dbus.Interface(self._object, "org.freedesktop.DBus.Properties")
         self._properties_signal = None
+
+        # extract the descriptions from the paths obtained via dbus. They end with /descXXXX.
+        self.descriptors = []
+        descriptor_regex = re.compile(self._path + '/desc[0-9abcdef]{4}$')
+        managed_descriptors = [desc for desc in self._object_manager.GetManagedObjects().items() if
+                               descriptor_regex.match(desc[0])]
+
+        for desc in managed_descriptors:
+            self.descriptors.append(Descriptor(self, desc[0], desc[1]['org.bluez.GattDescriptor1']['UUID']))
 
     def _connect_signals(self):
         if self._properties_signal is None:
