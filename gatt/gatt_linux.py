@@ -557,14 +557,12 @@ class Characteristic:
         self._properties = dbus.Interface(self._object, "org.freedesktop.DBus.Properties")
         self._properties_signal = None
 
-        # extract the descriptions from the paths obtained via dbus. They end with /descXXXX.
-        self.descriptors = []
         descriptor_regex = re.compile(self._path + '/desc[0-9abcdef]{4}$')
-        managed_descriptors = [desc for desc in self._object_manager.GetManagedObjects().items() if
-                               descriptor_regex.match(desc[0])]
-
-        for desc in managed_descriptors:
-            self.descriptors.append(Descriptor(self, desc[0], desc[1]['org.bluez.GattDescriptor1']['UUID']))
+        self.descriptors = [
+            Descriptor(self, desc[0], desc[1]['org.bluez.GattDescriptor1']['UUID'])
+            for desc in self._object_manager.GetManagedObjects().items()
+            if descriptor_regex.match(desc[0])
+        ]
 
     def _connect_signals(self):
         if self._properties_signal is None:
