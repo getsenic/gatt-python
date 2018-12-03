@@ -6,4 +6,5 @@ class AnyDeviceManager(gatt.DeviceManager):
 
 manager = AnyDeviceManager(adapter_name='hci0')
 manager.start_discovery()
+manager.set_timeout(3 * 1000); # Timeout after 3 seconds
 manager.run()

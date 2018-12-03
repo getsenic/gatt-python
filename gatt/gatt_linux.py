@@ -48,6 +48,9 @@ class DeviceManager:
 
         self.update_devices()
 
+    def set_timeout(self, timeout):
+        GObject.timeout_add(timeout, self.stop)
+
     @property
     def is_adapter_powered(self):
         return self._adapter_properties.Get('org.bluez.Adapter1', 'Powered') == 1
