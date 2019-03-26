@@ -124,11 +124,14 @@ class DeviceManager:
         self.update_devices()
         return self._devices.values()
 
-    def start_discovery(self, service_uuids=[]):
+    def start_discovery(self, service_uuids=[], timeout=None):
         """Starts a discovery for BLE devices with given service UUIDs.
 
         :param service_uuids: Filters the search to only return devices with given UUIDs.
+        :param timeout: Stops discovery after a timeout (in milliseconds).
         """
+        if timeout is not None:
+            GObject.timeout_add(timeout, self.stop)
 
         discovery_filter = {'Transport': 'le'}
         if service_uuids:  # D-Bus doesn't like empty lists, it needs to guess the type
