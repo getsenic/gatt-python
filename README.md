@@ -66,11 +66,10 @@ BlueZ also provides an interactive commandline tool to interact with Bluetooth d
 
 ### Installing GATT SDK for Python
 
-To install this GATT module and the Python3 D-Bus dependency globally, run:
+To install this GATT module globally, run:
 
 ```
 sudo pip3 install gatt
-sudo apt-get install python3-dbus
 ```
 
 #### Running the GATT control script
