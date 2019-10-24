@@ -63,6 +63,7 @@ class DeviceManager:
         This call blocks until you call `stop()` to stop the main loop.
         """
 
+
         if self._main_loop:
             return
 
@@ -86,7 +87,7 @@ class DeviceManager:
             self._properties_changed_signal.remove()
             self._interface_added_signal.remove()
 
-        self._main_loop = GObject.MainLoop()
+        self._main_loop = GObject.MainLoop.new(None, False)  # modification to launch run in a thread
         try:
             self._main_loop.run()
             disconnect_signals()
@@ -605,6 +606,7 @@ class Characteristic:
         :param value: array of bytes to be written
         :param offset: offset from where to start writing the bytes (defaults to 0)
         """
+        print("Sent : ", value)
         bytes = [dbus.Byte(b) for b in value]
 
         try:
@@ -640,6 +642,7 @@ class Characteristic:
         Each time when the device notifies a new value, `characteristic_value_updated()` of the related
         device will be called.
         """
+        print("enable_notifications called")
         try:
             if enabled:
                 self._object.StartNotify(
