@@ -596,7 +596,7 @@ class Characteristic:
             error = _error_from_dbus_error(e)
             self.service.device.characteristic_read_value_failed(self, error=error)
 
-    def write_value(self, value, offset=0):
+    def write_value(self, value, offset=0, with_response=True):
         """
         Attempts to write a value to the characteristic.
 
@@ -604,13 +604,20 @@ class Characteristic:
 
         :param value: array of bytes to be written
         :param offset: offset from where to start writing the bytes (defaults to 0)
+        :param with_response: whether a response should be requested for the write (defaults to True)
         """
         bytes = [dbus.Byte(b) for b in value]
+
+        if with_response == True:
+            write_type = "request"
+        else:
+            write_type = "command"
 
         try:
             self._object.WriteValue(
                 bytes,
-                {'offset': dbus.UInt16(offset, variant_level=1)},
+                {'offset': dbus.UInt16(offset, variant_level=1),
+                 'type': write_type},
                 reply_handler=self._write_value_succeeded,
                 error_handler=self._write_value_failed,
                 dbus_interface='org.bluez.GattCharacteristic1')
