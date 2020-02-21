@@ -470,7 +470,7 @@ class Service:
     """
 
     def __init__(self, device, path, uuid):
-        # TODO: Don'T requore `path` argument, it can be calculated from device's path and uuid
+        # TODO: Don't require `path` argument, it can be calculated from device's path and uuid
         self.device = device
         self.uuid = uuid
         self._path = path
