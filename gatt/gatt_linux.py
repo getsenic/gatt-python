@@ -124,13 +124,13 @@ class DeviceManager:
         self.update_devices()
         return self._devices.values()
 
-    def start_discovery(self, service_uuids=[], timeout=None):
+    def start_discovery(self, service_uuids=[], timeout=10000):
         """Starts a discovery for BLE devices with given service UUIDs.
 
         :param service_uuids: Filters the search to only return devices with given UUIDs.
-        :param timeout: Stops discovery after a timeout (in milliseconds).
+        :param timeout: Stops discovery after a timeout (in milliseconds). If set to 0, no timeout is used.
         """
-        if timeout is not None:
+        if timeout > 0:
             GObject.timeout_add(timeout, self.stop)
 
         discovery_filter = {'Transport': 'le'}
