@@ -10,7 +10,7 @@ except ImportError:
 
 import re
 
-from gi.repository import GObject
+from gi.repository import GLib
 
 from . import errors
 
@@ -86,7 +86,7 @@ class DeviceManager:
             self._properties_changed_signal.remove()
             self._interface_added_signal.remove()
 
-        self._main_loop = GObject.MainLoop()
+        self._main_loop = GLib.MainLoop()
         try:
             self._main_loop.run()
             disconnect_signals()
